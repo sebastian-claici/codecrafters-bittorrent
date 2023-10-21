@@ -1,7 +1,8 @@
 use anyhow::Context;
+use sha1::{Digest, Sha1};
 
 use crate::hashes::Hashes;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_bencode;
 use serde_json;
 
@@ -29,13 +30,13 @@ enum Command {
     },
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct Torrent {
     announce: String,
     info: Info,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct Info {
     name: String,
 
@@ -47,14 +48,14 @@ struct Info {
     keys: Keys,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(untagged)]
 enum Keys {
     SingleFile { length: usize },
     MultiFile { files: Vec<File> },
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 struct File {
     length: usize,
     path: Vec<String>,
@@ -124,6 +125,7 @@ fn main() -> anyhow::Result<()> {
         Command::Info { torrent } => {
             let f = std::fs::read(torrent).context("open torrent file")?;
             let t: Torrent = serde_bencode::from_bytes(&f).context("parse torrent file")?;
+            let d = serde_bencode::to_bytes(&t.info).context("bencode info dict")?;
             println!("Tracker URL: {}", t.announce);
             println!(
                 "Length: {}",
@@ -132,6 +134,11 @@ fn main() -> anyhow::Result<()> {
                     _ => todo!(),
                 }
             );
+
+            let mut hasher = Sha1::new();
+            hasher.update(d);
+            let result = hasher.finalize();
+            println!("Info Hash: {}", hex::encode(result));
         }
     }
 
@@ -140,8 +147,8 @@ fn main() -> anyhow::Result<()> {
 
 mod hashes {
     use serde::de::{self, Visitor};
-    use serde::Deserialize;
-    use serde::Deserializer;
+    use serde::{Deserializer, Serializer};
+    use serde::{Deserialize, Serialize};
 
     use std::fmt;
 
@@ -180,6 +187,16 @@ mod hashes {
             D: Deserializer<'de>,
         {
             deserializer.deserialize_bytes(HashesVisitor)
+        }
+    }
+
+    impl Serialize for Hashes {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            let single_slice = self.0.concat();
+            serializer.serialize_bytes(&single_slice)
         }
     }
 }
