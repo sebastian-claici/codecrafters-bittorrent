@@ -37,6 +37,21 @@ fn decode_bencoded_value(encoded_value: &str) -> (serde_json::Value, &str) {
             }
             return (values.into(), rest);
         }
+        Some('d') => {
+            let mut dict = serde_json::Map::new();
+            let mut rest = encoded_value.split_at(1).1;
+            while !rest.is_empty() && !rest.starts_with('e') {
+                let (key, remainder) = decode_bencoded_value(&rest);
+                let (value, remainder) = decode_bencoded_value(&remainder);
+                let key = match key {
+                    serde_json::Value::String(key) => key,
+                    _ => panic!("Dict keys must be strings")
+                };
+                dict.insert(key, value);
+                rest = &remainder;
+            }
+            return (dict.into(), rest);
+        }
         _ => {}
     }
 
