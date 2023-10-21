@@ -15,6 +15,15 @@ fn decode_bencoded_value(encoded_value: &str) -> serde_json::Value {
                 }
             }
         }
+        Some('i') => { 
+            let n = encoded_value
+            .split_once('i')
+            .and_then(|(_, rest)| rest.split_once('e'))
+            .and_then(|(n, _)| n.parse::<i64>().ok());
+            if let Some(n) = n {
+                return n.into();
+            }
+        }
         _ => {}
     }
 
