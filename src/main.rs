@@ -134,8 +134,12 @@ fn main() -> anyhow::Result<()> {
                     _ => todo!(),
                 }
             );
-
             println!("Info Hash: {}", hash_value(&d));
+            println!("Piece Length: {}", t.info.piece_length);
+            println!("Piece Hashes:");
+            for hash in t.info.pieces.0 {
+                println!("{}", hex::encode(&hash));
+            }
         }
     }
 
@@ -157,7 +161,7 @@ mod hashes {
     use std::fmt;
 
     #[derive(Debug, Clone)]
-    pub struct Hashes(Vec<[u8; 20]>);
+    pub struct Hashes(pub Vec<[u8; 20]>);
     struct HashesVisitor;
 
     impl<'de> Visitor<'de> for HashesVisitor {
