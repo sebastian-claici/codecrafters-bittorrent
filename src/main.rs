@@ -135,20 +135,24 @@ fn main() -> anyhow::Result<()> {
                 }
             );
 
-            let mut hasher = Sha1::new();
-            hasher.update(d);
-            let result = hasher.finalize();
-            println!("Info Hash: {}", hex::encode(result));
+            println!("Info Hash: {}", hash_value(&d));
         }
     }
 
     Ok(())
 }
 
+fn hash_value(bytes: &[u8]) -> String {
+    let mut hasher = Sha1::new();
+    hasher.update(bytes);
+    let result = hasher.finalize();
+    hex::encode(result)
+}
+
 mod hashes {
     use serde::de::{self, Visitor};
-    use serde::{Deserializer, Serializer};
     use serde::{Deserialize, Serialize};
+    use serde::{Deserializer, Serializer};
 
     use std::fmt;
 
