@@ -4,6 +4,7 @@ use bittorrent_starter_rust::decode::decode_bencoded_value;
 
 use anyhow::Context;
 
+use sha1::{Digest, Sha1};
 use serde_bencode;
 
 use std::path::PathBuf;
@@ -45,6 +46,11 @@ fn main() -> anyhow::Result<()> {
             let f = std::fs::read(torrent).context("open torrent file")?;
             let t: Torrent = serde_bencode::from_bytes(&f).context("parse torrent file")?;
             let d = serde_bencode::to_bytes(&t.info).context("bencode info dict")?;
+
+            let mut hasher = Sha1::new();
+            hasher.update(&d);
+            let info_hash = hasher.finalize();
+
             println!("Tracker URL: {}", t.announce);
             println!(
                 "Length: {}",
@@ -53,7 +59,7 @@ fn main() -> anyhow::Result<()> {
                     _ => todo!(),
                 }
             );
-            println!("Info Hash: {}", hex::encode(&d));
+            println!("Info Hash: {}", hex::encode(&info_hash));
             println!("Piece Length: {}", t.info.piece_length);
             println!("Piece Hashes:");
             for hash in t.info.pieces.0 {
