@@ -11,7 +11,7 @@ pub struct Torrent {
 }
 
 impl Torrent {
-    pub fn info_hash(&self) -> anyhow::Result<String> {
+    pub fn info_hash(&self) -> anyhow::Result<[u8; 20]> {
         let info_dict = serde_bencode::to_bytes(&self.info).context("bencode info dict")?;
         let mut hasher = Sha1::new();
         hasher.update(&info_dict);
@@ -20,6 +20,10 @@ impl Torrent {
             .try_into()
             .expect("should only have 20 bytes");
 
+        Ok(info_hash)
+    }
+
+    pub fn encode_hash(&self, info_hash: [u8; 20]) -> anyhow::Result<String> {
         // Encode info_hash into url encoded string
         let mut encoded = String::with_capacity(3 * info_hash.len());
         for &byte in &info_hash {
@@ -28,6 +32,7 @@ impl Torrent {
         }
 
         Ok(encoded)
+
     }
 }
 

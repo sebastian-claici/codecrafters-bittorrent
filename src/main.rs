@@ -1,12 +1,15 @@
+use bittorrent_starter_rust::decode::decode_bencoded_value;
+use bittorrent_starter_rust::peer::Handshake;
 use bittorrent_starter_rust::torrent::{Keys, Torrent};
 use bittorrent_starter_rust::tracker::{TrackerRequest, TrackerResponse};
-use bittorrent_starter_rust::decode::decode_bencoded_value;
 
 use anyhow::Context;
 
-use sha1::{Digest, Sha1};
 use serde_bencode;
+use sha1::{Digest, Sha1};
+use tokio::io::AsyncWriteExt;
 
+use std::net::SocketAddrV4;
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
@@ -32,10 +35,15 @@ enum Command {
     Peers {
         torrent: PathBuf,
     },
+    Handshake {
+        torrent: PathBuf,
+        peer: String,
+    },
 }
 
 // Usage: your_bittorrent.sh decode "<encoded_value>"
-fn main() -> anyhow::Result<()> {
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
     let args = Args::parse();
     match args.command {
         Command::Decode { value } => {
@@ -46,10 +54,7 @@ fn main() -> anyhow::Result<()> {
             let f = std::fs::read(torrent).context("open torrent file")?;
             let t: Torrent = serde_bencode::from_bytes(&f).context("parse torrent file")?;
             let d = serde_bencode::to_bytes(&t.info).context("bencode info dict")?;
-
-            let mut hasher = Sha1::new();
-            hasher.update(&d);
-            let info_hash = hasher.finalize();
+            let info_hash = t.info_hash()?;
 
             println!("Tracker URL: {}", t.announce);
             println!(
@@ -70,6 +75,7 @@ fn main() -> anyhow::Result<()> {
             let f = std::fs::read(torrent).context("open torrent file")?;
             let t: Torrent = serde_bencode::from_bytes(&f).context("parse torrent file")?;
             let info_hash = t.info_hash()?;
+            let info_hash = t.encode_hash(info_hash)?;
             let length = match t.info.keys {
                 Keys::SingleFile { length } => length,
                 _ => todo!(),
@@ -90,11 +96,29 @@ fn main() -> anyhow::Result<()> {
             url_params.push_str(&format!("&info_hash={}", request.info_hash));
             url.set_query(Some(&url_params));
 
-            let response = reqwest::blocking::get(url)?.bytes()?;
+            let response = reqwest::get(url).await?.bytes().await?;
             let response: TrackerResponse = serde_bencode::from_bytes(&response)?;
             for peer in response.peers.0 {
                 println!("{}", peer);
             }
+        }
+        Command::Handshake { torrent, peer } => {
+            let f = std::fs::read(torrent).context("open torrent file")?;
+            let t: Torrent = serde_bencode::from_bytes(&f).context("parse torrent file")?;
+            let info_hash = t.info_hash()?;
+            let length = match t.info.keys {
+                Keys::SingleFile { length } => length,
+                _ => todo!(),
+            };
+
+            let peer: SocketAddrV4 = peer.parse().expect("unable to parse peer address");
+            let mut stream = tokio::net::TcpStream::connect(&peer).await?;
+            let mut handshake = Handshake::new(
+                info_hash,
+                *b"00112233445566778899"
+            );
+            let handshake_bytes = &handshake as *const Handshake as *const [u8; std::mem::size_of::<Handshake>()];
+            stream.write_all(unsafe { &*handshake_bytes }).await?;
         }
     }
 
