@@ -120,7 +120,7 @@ async fn main() -> anyhow::Result<()> {
 
             assert_eq!(handshake.protocol_length, 19);
             assert_eq!(&handshake.protocol, b"BitTorrent protocol");
-            println!("PeerID: {}", hex::encode(handshake.peer_id));
+            println!("Peer ID: {}", hex::encode(handshake.peer_id));
         }
     }
 
