@@ -6,7 +6,7 @@ use bittorrent_starter_rust::tracker::{TrackerRequest, TrackerResponse};
 use anyhow::Context;
 
 use serde_bencode;
-use tokio::io::{AsyncWriteExt, AsyncReadExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use std::net::SocketAddrV4;
 use std::path::PathBuf;
@@ -52,7 +52,7 @@ async fn main() -> anyhow::Result<()> {
         Command::Info { torrent } => {
             let f = std::fs::read(torrent).context("open torrent file")?;
             let t: Torrent = serde_bencode::from_bytes(&f).context("parse torrent file")?;
-            let d = serde_bencode::to_bytes(&t.info).context("bencode info dict")?;
+            let _d = serde_bencode::to_bytes(&t.info).context("bencode info dict")?;
             let info_hash = t.info_hash()?;
 
             println!("Tracker URL: {}", t.announce);
@@ -109,11 +109,9 @@ async fn main() -> anyhow::Result<()> {
             let peer: SocketAddrV4 = peer.parse().expect("unable to parse peer address");
             let mut stream = tokio::net::TcpStream::connect(&peer).await?;
 
-            let mut handshake = Handshake::new(
-                info_hash,
-                *b"00112233445566778899"
-            );
-            let handshake_bytes = &mut handshake as *mut Handshake as *mut [u8; std::mem::size_of::<Handshake>()];
+            let mut handshake = Handshake::new(info_hash, *b"00112233445566778899");
+            let handshake_bytes =
+                &mut handshake as *mut Handshake as *mut [u8; std::mem::size_of::<Handshake>()];
             let handshake_bytes = unsafe { &mut *handshake_bytes };
             stream.write_all(handshake_bytes).await?;
             stream.read_exact(handshake_bytes).await?;
